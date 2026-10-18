@@ -1,0 +1,214 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.01em;
+    background-color: #0b0f17;
+    color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  .font-serif-luxury {
+    font-family: 'Cinzel', serif;
+  }
+
+  .font-display-luxury {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+/* ==========================================================================
+   ULTRA-CLEAR HIGH-CONTRAST THEME (সকল লেখা ও টেক্সট ১০০% স্পষ্ট ও উজ্জ্বল)
+   ========================================================================== */
+
+/* Universal High Contrast Rules: Every word must be sharp and legible */
+body {
+  background-color: #0a0e17 !important;
+  color: #ffffff !important;
+}
+
+/* Main Backgrounds & Containers */
+.bg-neutral-950,
+.bg-\[\#0c0e12\] {
+  background-color: #0a0e17 !important;
+}
+
+.bg-neutral-900 {
+  background-color: #121824 !important;
+}
+
+.bg-neutral-850,
+.bg-neutral-800 {
+  background-color: #1a2232 !important;
+}
+
+.bg-neutral-700 {
+  background-color: #263145 !important;
+}
+
+/* Borders with clean high definition */
+.border-neutral-900,
+.border-neutral-850,
+.border-neutral-800,
+.border-neutral-700 {
+  border-color: #263347 !important;
+}
+
+.border-amber-900\/30,
+.border-amber-900\/40,
+.border-amber-500\/30 {
+  border-color: rgba(245, 158, 11, 0.45) !important;
+}
+
+/* Text Colors: NEVER FAINT, ALWAYS ULTRA-LEGIBLE */
+/* Primary text is pure crisp white */
+.text-neutral-100,
+.text-neutral-200 {
+  color: #ffffff !important;
+}
+
+/* Secondary text is bright light slate/white, never dim grey */
+.text-neutral-300 {
+  color: #f1f5f9 !important;
+}
+
+.text-neutral-400 {
+  color: #e2e8f0 !important;
+}
+
+.text-neutral-500 {
+  color: #cbd5e1 !important;
+}
+
+.text-neutral-600 {
+  color: #94a3b8 !important;
+}
+
+/* Gold / Amber Accents: Radiant and high contrast */
+.text-amber-200,
+.text-amber-300 {
+  color: #fde68a !important;
+}
+
+.text-amber-400 {
+  color: #fbbf24 !important;
+  font-weight: 600;
+}
+
+.text-amber-500 {
+  color: #f59e0b !important;
+}
+
+/* Inputs, Selects & Textareas: High contrast & crystal clear typing */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  background-color: #141b27 !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+  font-weight: 500 !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #f59e0b !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
+  background-color: #172030 !important;
+}
+
+/* Tables: Crystal clear data rows */
+th {
+  background-color: #141c2a !important;
+  color: #ffffff !important;
+  border-color: #263347 !important;
+  font-weight: 700 !important;
+}
+
+td {
+  border-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+tr:hover td {
+  background-color: #172233 !important;
+}
+
+/* Cards & Elevated Panels */
+.shadow-2xl,
+.shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Mobile viewport fit & smooth touch */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.safe-area-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0d121c;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a384f;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d97706;
+}
+
+/* Thermal Sticker & Card Printing Media Styles */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  @page {
+    margin: 0;
+    size: auto;
+  }
+}
