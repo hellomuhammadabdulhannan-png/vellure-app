@@ -17,6 +17,31 @@ import { BRAND_DETAILS } from '../../data/initialData';
 import { formatBDT, getCourierTrackingUrl } from '../../utils/formatters';
 import { SvgBarcode } from '../SvgBarcode';
 import { SvgQrCode } from '../SvgQrCode';
+import { PrintPortal } from '../PrintPortal';
+import { printNow, mmToPx, loadSetting, saveSetting } from '../../utils/printEngine';
+
+type StickerFormat = '3x2' | '4x6' | '80mm';
+
+/**
+ * Physical paper sizes (mm) and the size the on-screen label design was drawn at (px).
+ * The label is zoomed to fit the real paper so one sticker = one page.
+ * Box sizes are ~0.5mm smaller than the page so rounding never creates an extra blank page.
+ */
+const STICKER_PAPER: Record<
+  StickerFormat,
+  { pageW: number; pageH?: number; boxW: number; boxH?: number; srcW: number; srcH?: number }
+> = {
+  '3x2': { pageW: 76, pageH: 50, boxW: 75.5, boxH: 49.5, srcW: 320, srcH: 210 },
+  '4x6': { pageW: 100, pageH: 150, boxW: 99.5, boxH: 149.5, srcW: 360, srcH: 520 },
+  '80mm': { pageW: 80, boxW: 72, srcW: 280 },
+};
+
+function stickerZoom(fmt: StickerFormat): number {
+  const p = STICKER_PAPER[fmt];
+  const byWidth = mmToPx(p.boxW) / p.srcW;
+  if (p.boxH && p.srcH) return Math.min(byWidth, mmToPx(p.boxH) / p.srcH);
+  return byWidth;
+}
 
 interface CourierThermalPrinterProps {
   invoices: Invoice[];
@@ -29,7 +54,9 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
   initialSelectedId,
   onMarkPrinted,
 }) => {
-  const [selectedFormat, setSelectedFormat] = useState<'3x2' | '4x6' | '80mm'>('3x2');
+  const [selectedFormat, setSelectedFormat] = useState<StickerFormat>(() =>
+    loadSetting<StickerFormat>('sticker_format', ['3x2', '4x6', '80mm'] as const, '3x2')
+  );
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>(
     initialSelectedId || (invoices[0]?.id ?? '')
   );
@@ -54,8 +81,17 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
     } else if (currentInvoice) {
       onMarkPrinted(currentInvoice.id);
     }
-    window.print();
+    saveSetting('sticker_format', selectedFormat);
+    const paper = STICKER_PAPER[selectedFormat];
+    if (paper.pageH) {
+      printNow({ widthMm: paper.pageW, heightMm: paper.pageH, marginMm: 0 });
+    } else {
+      printNow({ widthMm: paper.pageW, autoHeight: true, marginMm: 0 });
+    }
   };
+
+  // What actually goes to the printer (only these labels, nothing else from the page)
+  const labelsToPrint = batchMode ? batchInvoices : currentInvoice ? [currentInvoice] : [];
 
   const handleToggleBatchItem = (id: string) => {
     setSelectedForBatch((prev) =>
@@ -470,6 +506,29 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Printable stickers: hidden on screen, the only thing sent to the printer */}
+      <PrintPortal>
+        {labelsToPrint.map((inv) => {
+          const paper = STICKER_PAPER[selectedFormat];
+          return (
+            <div
+              key={inv.id}
+              className="vp-page"
+              style={{
+                width: `${paper.boxW}mm`,
+                height: paper.boxH ? `${paper.boxH}mm` : undefined,
+                margin: paper.boxH ? 0 : '0 4mm',
+                background: '#fff',
+              }}
+            >
+              <div style={{ zoom: stickerZoom(selectedFormat) }}>
+                {renderThermalLabel(inv, selectedFormat)}
+              </div>
+            </div>
+          );
+        })}
+      </PrintPortal>
     </div>
   );
 };

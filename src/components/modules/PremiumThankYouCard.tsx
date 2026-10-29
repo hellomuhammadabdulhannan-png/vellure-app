@@ -15,6 +15,12 @@ import { Invoice } from '../../types';
 import { BRAND_DETAILS } from '../../data/initialData';
 import { SvgQrCode } from '../SvgQrCode';
 import { VELLURE_LOGO } from '../../assets/logo';
+import { PrintPortal } from '../PrintPortal';
+import { ThankYouThermalPrint } from '../PrintLayouts';
+import { printNow, mmToPx, loadSetting, saveSetting } from '../../utils/printEngine';
+
+type CardLayout = 'thermal-3x2' | 'thermal-80mm' | 'single' | '4-up-a4';
+const CARD_LAYOUTS = ['thermal-3x2', 'thermal-80mm', 'single', '4-up-a4'] as const;
 
 interface PremiumThankYouCardProps {
   invoices: Invoice[];
@@ -35,7 +41,9 @@ export const PremiumThankYouCard: React.FC<PremiumThankYouCardProps> = ({
     initialSelectedInvoice?.items.map(i => i.productName).join(' & ') || 'Oud Royal De Sreemangal'
   );
   const [cardTheme, setCardTheme] = useState<'obsidian-gold' | 'royal-emerald' | 'cream-parchment'>('obsidian-gold');
-  const [cardLayout, setCardLayout] = useState<'single' | '4-up-a4'>('single');
+  const [cardLayout, setCardLayout] = useState<CardLayout>(() =>
+    loadSetting<CardLayout>('thankyou_layout', CARD_LAYOUTS, 'thermal-3x2')
+  );
   const [customBespokeMessage, setCustomBespokeMessage] = useState(
     'We invite you to experience the transcendent depth of pure artisanal distillation. May this bespoke flacon bring distinction and serenity to your days.'
   );
@@ -47,7 +55,17 @@ export const PremiumThankYouCard: React.FC<PremiumThankYouCardProps> = ({
   };
 
   const handlePrint = () => {
-    window.print();
+    saveSetting('thankyou_layout', cardLayout);
+    if (cardLayout === 'thermal-3x2') {
+      printNow({ widthMm: 76, heightMm: 50, marginMm: 0 });
+    } else if (cardLayout === 'thermal-80mm') {
+      printNow({ widthMm: 80, autoHeight: true, marginMm: 0 });
+    } else if (cardLayout === 'single') {
+      // A6 landscape postcard
+      printNow({ widthMm: 148, heightMm: 105, marginMm: 0 });
+    } else {
+      printNow({ widthMm: 210, heightMm: 297, marginMm: 6 });
+    }
   };
 
   // Render a single luxury card
@@ -213,6 +231,26 @@ export const PremiumThankYouCard: React.FC<PremiumThankYouCardProps> = ({
         <div className="flex items-center space-x-2">
           <span className="text-neutral-400 font-medium">Print Paper Layout:</span>
           <button
+            onClick={() => setCardLayout('thermal-3x2')}
+            className={`px-3 py-1.5 rounded-lg transition-all ${
+              cardLayout === 'thermal-3x2'
+                ? 'bg-amber-500 text-neutral-950 font-bold'
+                : 'bg-neutral-950 text-neutral-400 border border-neutral-800'
+            }`}
+          >
+            Thermal Sticker 3" x 2"
+          </button>
+          <button
+            onClick={() => setCardLayout('thermal-80mm')}
+            className={`px-3 py-1.5 rounded-lg transition-all ${
+              cardLayout === 'thermal-80mm'
+                ? 'bg-amber-500 text-neutral-950 font-bold'
+                : 'bg-neutral-950 text-neutral-400 border border-neutral-800'
+            }`}
+          >
+            Thermal 80mm Roll
+          </button>
+          <button
             onClick={() => setCardLayout('single')}
             className={`px-3 py-1.5 rounded-lg transition-all ${
               cardLayout === 'single'
@@ -314,7 +352,7 @@ export const PremiumThankYouCard: React.FC<PremiumThankYouCardProps> = ({
               <div className="flex items-center space-x-2">
                 <Crown className="w-4 h-4 text-amber-400" />
                 <span className="font-semibold text-neutral-200">
-                  Luxury Packaging Insert Live Preview ({cardLayout === 'single' ? '1 Card' : '4-Up Grid'})
+                  Luxury Packaging Insert Live Preview ({cardLayout === 'single' ? '1 Card' : cardLayout === '4-up-a4' ? '4-Up Grid' : 'Thermal Sticker'})
                 </span>
               </div>
               <span className="text-neutral-500 font-mono text-[10px]">
@@ -324,7 +362,16 @@ export const PremiumThankYouCard: React.FC<PremiumThankYouCardProps> = ({
 
             {/* Print Container */}
             <div className="print-container bg-neutral-950/70 p-6 rounded-xl border border-neutral-800/80 flex items-center justify-center overflow-auto min-h-[420px]">
-              {cardLayout === 'single' ? (
+              {cardLayout === 'thermal-3x2' || cardLayout === 'thermal-80mm' ? (
+                <div className="bg-white rounded-md shadow-xl p-1 text-black">
+                  <ThankYouThermalPrint
+                    variant={cardLayout === 'thermal-3x2' ? '3x2' : '80mm'}
+                    recipientName={recipientName}
+                    fragrance={fragrancePurchased}
+                    message={customBespokeMessage}
+                  />
+                </div>
+              ) : cardLayout === 'single' ? (
                 renderCardContent(1)
               ) : (
                 <div className="grid grid-cols-2 gap-4 max-w-[1000px]">
@@ -350,6 +397,41 @@ export const PremiumThankYouCard: React.FC<PremiumThankYouCardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Printable output: hidden on screen, the only thing sent to the printer */}
+      <PrintPortal>
+        {cardLayout === 'thermal-3x2' || cardLayout === 'thermal-80mm' ? (
+          <ThankYouThermalPrint
+            variant={cardLayout === 'thermal-3x2' ? '3x2' : '80mm'}
+            recipientName={recipientName}
+            fragrance={fragrancePurchased}
+            message={customBespokeMessage}
+          />
+        ) : cardLayout === 'single' ? (
+          <div
+            className="vp-page"
+            style={{ width: '148mm', height: '104mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            {renderCardContent(1)}
+          </div>
+        ) : (
+          <div
+            className="vp-page"
+            style={{
+              width: '976px',
+              display: 'grid',
+              gridTemplateColumns: '480px 480px',
+              gap: '16px',
+              zoom: mmToPx(97) / 480,
+            }}
+          >
+            {renderCardContent(1)}
+            {renderCardContent(2)}
+            {renderCardContent(3)}
+            {renderCardContent(4)}
+          </div>
+        )}
+      </PrintPortal>
     </div>
   );
 };

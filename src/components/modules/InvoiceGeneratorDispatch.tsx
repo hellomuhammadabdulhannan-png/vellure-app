@@ -27,6 +27,9 @@ import { formatBDT, buildWhatsAppLink, getCourierTrackingUrl, sanitizeBDPhone } 
 import { BRAND_DETAILS } from '../../data/initialData';
 import { SvgBarcode } from '../SvgBarcode';
 import { VELLURE_LOGO } from '../../assets/logo';
+import { PrintPortal } from '../PrintPortal';
+import { ReceiptInvoicePrint, InvoiceFormat } from '../PrintLayouts';
+import { printNow, loadSetting, saveSetting } from '../../utils/printEngine';
 
 interface InvoiceGeneratorDispatchProps {
   invoices: Invoice[];
@@ -55,6 +58,19 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [filterCourier, setFilterCourier] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [invoiceFormat, setInvoiceFormat] = useState<InvoiceFormat>(() =>
+    loadSetting<InvoiceFormat>('invoice_format', ['thermal80', 'a4'] as const, 'thermal80')
+  );
+
+  const handlePrintInvoice = () => {
+    saveSetting('invoice_format', invoiceFormat);
+    if (invoiceFormat === 'a4') {
+      printNow({ widthMm: 210, heightMm: 297, marginMm: 8 });
+    } else {
+      // 80mm roll: width fixed, height = content height (one invoice = one page)
+      printNow({ widthMm: 80, autoHeight: true, marginMm: 0 });
+    }
+  };
 
   // Default initial date: today in YYYY-MM-DD format
   const getTodayDate = () => new Date().toISOString().split('T')[0];
@@ -1612,8 +1628,17 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
                 >
                   Thermal Sticker
                 </button>
+                <select
+                  value={invoiceFormat}
+                  onChange={(e) => setInvoiceFormat(e.target.value as InvoiceFormat)}
+                  className="px-2 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 text-xs"
+                  aria-label="Invoice paper size"
+                >
+                  <option value="thermal80">80mm Thermal Roll</option>
+                  <option value="a4">A4 Paper</option>
+                </select>
                 <button
-                  onClick={() => window.print()}
+                  onClick={handlePrintInvoice}
                   className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 text-neutral-950 font-bold text-xs"
                 >
                   Print Invoice
@@ -1623,6 +1648,11 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
           </div>
         </div>
       )}
+
+      {/* Printable invoice (hidden on screen, the only thing printed) */}
+      <PrintPortal>
+        {viewingInvoice && <ReceiptInvoicePrint invoice={viewingInvoice} format={invoiceFormat} />}
+      </PrintPortal>
     </div>
   );
 };

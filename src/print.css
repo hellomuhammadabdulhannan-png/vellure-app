@@ -1,0 +1,68 @@
+/* ==========================================================================
+   VELLURE print rules
+   Only #print-root is printed. The rest of the app is hidden, so a thermal
+   printer gets exactly one invoice / sticker / card per page.
+   ========================================================================== */
+
+#print-root {
+  display: none;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* hide the whole app (#root, modals, toasts...) */
+  body > *:not(#print-root) {
+    display: none !important;
+  }
+
+  #print-root {
+    display: block !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  #print-root,
+  #print-root * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+  }
+
+  /* the dark theme forces light text on td/th - undo that for paper */
+  #print-root td,
+  #print-root th {
+    color: #000000 !important;
+    background: transparent !important;
+    border-color: #000000 !important;
+  }
+
+  /* one logical sheet per page; no blank page after the last one */
+  .vp-page {
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    overflow: hidden;
+  }
+
+  .vp-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
