@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Truck,
@@ -61,6 +61,15 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
   const [invoiceFormat, setInvoiceFormat] = useState<InvoiceFormat>(() =>
     loadSetting<InvoiceFormat>('invoice_format', ['thermal80', 'a4'] as const, 'thermal80')
   );
+
+  // Direct print from the list row (no need to open the preview first)
+  const [directPrintInvoice, setDirectPrintInvoice] = useState<Invoice | null>(null);
+  useEffect(() => {
+    if (directPrintInvoice) {
+      handlePrintInvoice();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directPrintInvoice]);
 
   const handlePrintInvoice = () => {
     saveSetting('invoice_format', invoiceFormat);
@@ -639,8 +648,20 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
+                            onClick={() => {
+                              // always re-trigger, even for the same invoice
+                              setDirectPrintInvoice(null);
+                              setTimeout(() => setDirectPrintInvoice(inv), 0);
+                            }}
+                            title="Print Invoice (সরাসরি ইনভয়েস প্রিন্ট)"
+                            className="flex items-center space-x-1 px-2 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-[11px] font-bold transition-colors"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Invoice</span>
+                          </button>
+                          <button
                             onClick={() => onNavigateToThermal(inv.id)}
-                            title="Thermal Sticker Label"
+                            title="Courier Sticker (Page 7)"
                             className="p-1.5 rounded-lg bg-neutral-800 hover:bg-amber-500 text-neutral-300 hover:text-neutral-950 transition-colors"
                           >
                             <Printer className="w-3.5 h-3.5" />
@@ -1651,7 +1672,9 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
 
       {/* Printable invoice (hidden on screen, the only thing printed) */}
       <PrintPortal>
-        {viewingInvoice && <ReceiptInvoicePrint invoice={viewingInvoice} format={invoiceFormat} />}
+        {(viewingInvoice || directPrintInvoice) && (
+          <ReceiptInvoicePrint invoice={(viewingInvoice || directPrintInvoice)!} format={invoiceFormat} />
+        )}
       </PrintPortal>
     </div>
   );
