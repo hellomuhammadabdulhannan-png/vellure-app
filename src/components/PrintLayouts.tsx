@@ -4,6 +4,7 @@ import { BRAND_DETAILS } from '../data/initialData';
 import { formatBDT } from '../utils/formatters';
 import { SvgBarcode } from './SvgBarcode';
 import { SvgQrCode } from './SvgQrCode';
+import { VELLURE_LOGO_PRINT } from '../assets/logo';
 
 /* ------------------------------------------------------------------ */
 /*  Invoice: 80mm thermal receipt  (or A4)                             */
@@ -38,12 +39,11 @@ export const ReceiptInvoicePrint: React.FC<{ invoice: Invoice; format: InvoiceFo
     >
       {/* Brand */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: "'Cinzel', serif", fontWeight: 800, letterSpacing: '0.25em', fontSize: isA4 ? '22pt' : '15pt' }}>
-          {BRAND_DETAILS.name}
-        </div>
-        <div style={{ fontSize: isA4 ? '9pt' : '7pt', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-          {BRAND_DETAILS.tagline}
-        </div>
+        <img
+          src={VELLURE_LOGO_PRINT}
+          alt={BRAND_DETAILS.name}
+          style={{ width: isA4 ? '48mm' : '36mm', height: 'auto', display: 'block', margin: '0 auto' }}
+        />
         <div style={{ fontSize: isA4 ? '9pt' : '7.5pt', marginTop: '1mm' }}>{BRAND_DETAILS.address}</div>
         <div style={{ fontSize: isA4 ? '9pt' : '7.5pt' }}>
           {BRAND_DETAILS.mobile} • {BRAND_DETAILS.website}
@@ -198,27 +198,19 @@ export const ThankYouThermalPrint: React.FC<{
         justifyContent: 'space-between',
       }}
     >
-      <div>
-        <div
-          style={{
-            fontFamily: "'Cinzel', serif",
-            fontWeight: 800,
-            letterSpacing: '0.28em',
-            fontSize: compact ? '11pt' : '15pt',
-          }}
-        >
-          {BRAND_DETAILS.name}
-        </div>
-        <div style={{ fontSize: compact ? '5.5pt' : '7pt', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-          {BRAND_DETAILS.tagline}
-        </div>
+      <div style={{ textAlign: 'center' }}>
+        <img
+          src={VELLURE_LOGO_PRINT}
+          alt={BRAND_DETAILS.name}
+          style={{ height: compact ? '12mm' : '22mm', width: 'auto', display: 'block', margin: '0 auto' }}
+        />
       </div>
 
       <div>
         <div style={{ fontWeight: 800, fontSize: compact ? '9pt' : '12pt', ...clamp(1) }}>
           Thank You, {recipientName}
         </div>
-        <div style={{ fontStyle: 'italic', fontSize: compact ? '6pt' : '8pt', marginTop: '0.8mm', ...clamp(compact ? 3 : 4) }}>
+        <div style={{ fontStyle: 'italic', fontSize: compact ? '6pt' : '8pt', marginTop: '0.8mm', ...clamp(compact ? 2 : 4) }}>
           {message}
         </div>
         <div
@@ -250,7 +242,7 @@ export const ThankYouThermalPrint: React.FC<{
         </div>
         <SvgQrCode
           value={`https://${BRAND_DETAILS.website}/vip?customer=${encodeURIComponent(recipientName)}`}
-          size={compact ? 34 : 48}
+          size={compact ? 52 : 72}
         />
       </div>
     </div>
