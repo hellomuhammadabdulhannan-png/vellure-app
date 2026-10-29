@@ -1,0 +1,24 @@
+name: Keep Render app awake
+
+# Pings the live app so Render's free plan does not put it to sleep.
+# GitHub's shortest schedule is every 5 minutes (runs can start a few minutes late).
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # lets you run it manually from the Actions tab
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping app.vellurefragrances.com
+        run: |
+          curl --silent --show-error --location \
+            --retry 3 --retry-delay 10 --retry-all-errors \
+            --max-time 90 \
+            --output /dev/null \
+            --write-out "HTTP %{http_code} in %{time_total}s\n" \
+            "https://app.vellurefragrances.com/"
