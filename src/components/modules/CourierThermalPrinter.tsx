@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Printer,
   Settings,
@@ -19,6 +19,7 @@ import { SvgBarcode } from '../SvgBarcode';
 import { SvgQrCode } from '../SvgQrCode';
 import { PrintPortal } from '../PrintPortal';
 import { printNow, mmToPx, loadSetting, saveSetting } from '../../utils/printEngine';
+import { labelElementToPng, mmToDots, downloadBlob, shareBlob } from '../../utils/labelImage';
 
 type StickerFormat = '3x2' | '4x6' | '80mm';
 
@@ -60,6 +61,61 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>(
     initialSelectedId || (invoices[0]?.id ?? '')
   );
+  // ---- Image export (for printing from a phone through a printer app) ----
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [imgW, setImgW] = useState<number>(() => {
+    try { return Number(localStorage.getItem('vellure_print_img_w')) || 76; } catch { return 76; }
+  });
+  const [imgH, setImgH] = useState<number>(() => {
+    try { return Number(localStorage.getItem('vellure_print_img_h')) || 50; } catch { return 50; }
+  });
+  const [imgBusy, setImgBusy] = useState(false);
+  const [imgMsg, setImgMsg] = useState('');
+
+  const applyFormatSize = (fmt: StickerFormat) => {
+    const dims = { '3x2': [76, 50], '4x6': [100, 150], '80mm': [72, 60] }[fmt];
+    setImgW(dims[0]);
+    setImgH(dims[1]);
+  };
+
+  const exportImages = async (mode: 'download' | 'share') => {
+    const root = previewRef.current;
+    if (!root) return;
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>('[data-sticker]'));
+    if (nodes.length === 0) {
+      setImgMsg('কোনো স্টিকার সিলেক্ট করা নেই।');
+      return;
+    }
+    setImgBusy(true);
+    setImgMsg('');
+    try {
+      try {
+        localStorage.setItem('vellure_print_img_w', String(imgW));
+        localStorage.setItem('vellure_print_img_h', String(imgH));
+      } catch { /* ignore */ }
+      const wPx = mmToDots(imgW);
+      const hPx = mmToDots(imgH);
+      for (const node of nodes) {
+        const id = node.getAttribute('data-sticker') || 'label';
+        const blob = await labelElementToPng(node, { widthPx: wPx, heightPx: hPx });
+        const name = `vellure-sticker-${id}.png`;
+        if (mode === 'share') {
+          const ok = await shareBlob(blob, name);
+          if (!ok) downloadBlob(blob, name);
+        } else {
+          downloadBlob(blob, name);
+        }
+        const inv = invoices.find((i) => i.id === id);
+        if (inv) onMarkPrinted(inv.id);
+      }
+      setImgMsg(`${nodes.length} টি ছবি তৈরি হয়েছে (${wPx}×${hPx} px, ${imgW}×${imgH} mm)।`);
+    } catch (e) {
+      setImgMsg('ছবি তৈরি করা যায়নি। এই ব্রাউজারে সম্ভব নয়, Chrome ব্যবহার করুন।');
+    } finally {
+      setImgBusy(false);
+    }
+  };
+
   const [batchMode, setBatchMode] = useState<boolean>(false);
   const [selectedForBatch, setSelectedForBatch] = useState<string[]>(
     invoices.filter(i => !i.thermalPrinted).map(i => i.id)
@@ -108,6 +164,7 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
       return (
         <div
           key={inv.id}
+          data-sticker={inv.id}
           className="w-[320px] h-[210px] bg-white text-black p-3 font-sans border-2 border-black flex flex-col justify-between select-none mx-auto my-2 rounded-sm shadow-sm print:shadow-none print:m-0 print:border-black"
           style={{ fontFamily: 'system-ui, sans-serif' }}
         >
@@ -170,6 +227,7 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
       return (
         <div
           key={inv.id}
+          data-sticker={inv.id}
           className="w-[360px] h-[520px] bg-white text-black p-4 font-sans border-4 border-black flex flex-col justify-between select-none mx-auto my-3 rounded-sm shadow-md print:shadow-none print:m-0 print:border-black"
           style={{ fontFamily: 'system-ui, sans-serif' }}
         >
@@ -256,6 +314,7 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
     return (
       <div
         key={inv.id}
+        data-sticker={inv.id}
         className="w-[280px] bg-white text-black p-3 font-mono border border-black flex flex-col justify-between select-none mx-auto my-2 text-[11px] shadow-sm print:shadow-none print:m-0"
       >
         <div className="text-center border-b border-black pb-1 mb-2">
@@ -330,7 +389,7 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
           {(['3x2', '4x6', '80mm'] as const).map((fmt) => (
             <button
               key={fmt}
-              onClick={() => setSelectedFormat(fmt)}
+              onClick={() => { setSelectedFormat(fmt); applyFormatSize(fmt); }}
               className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-all ${
                 selectedFormat === fmt
                   ? 'bg-amber-500 text-neutral-950'
@@ -366,6 +425,58 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
             Batch Stream Queue ({selectedForBatch.length})
           </button>
         </div>
+      </div>
+
+      {/* Phone printing: export exact-size image for the printer app */}
+      <div className="no-print bg-emerald-950/30 border border-emerald-700/40 rounded-2xl p-4 text-xs space-y-3">
+        <div className="font-semibold text-emerald-300">
+          📱 মোবাইল থেকে প্রিন্ট: স্টিকারের ছবি (PNG) বানান, তারপর প্রিন্টার অ্যাপে প্রিন্ট করুন
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-1.5 text-neutral-300">
+            স্টিকার চওড়া
+            <input
+              type="number"
+              min={20}
+              max={104}
+              value={imgW}
+              onChange={(e) => setImgW(Number(e.target.value) || 0)}
+              className="w-16 px-2 py-1 rounded-lg border text-center font-mono"
+            />
+            mm
+          </label>
+          <label className="flex items-center gap-1.5 text-neutral-300">
+            লম্বা
+            <input
+              type="number"
+              min={20}
+              max={300}
+              value={imgH}
+              onChange={(e) => setImgH(Number(e.target.value) || 0)}
+              className="w-16 px-2 py-1 rounded-lg border text-center font-mono"
+            />
+            mm
+          </label>
+          <button
+            onClick={() => exportImages('download')}
+            disabled={imgBusy || imgW < 20 || imgH < 20}
+            className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-neutral-950 font-bold"
+          >
+            {imgBusy ? 'তৈরি হচ্ছে…' : '⬇ ছবি ডাউনলোড (PNG)'}
+          </button>
+          <button
+            onClick={() => exportImages('share')}
+            disabled={imgBusy || imgW < 20 || imgH < 20}
+            className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 text-neutral-100 font-bold border border-neutral-700"
+          >
+            ↗ প্রিন্টার অ্যাপে শেয়ার
+          </button>
+        </div>
+        <div className="text-neutral-400 leading-relaxed">
+          স্টিকার রোলের আসল মাপ (mm) লিখুন। ছবি ঠিক সেই মাপে ২০৩ DPI তে বানানো হয়, তাই প্রিন্ট ছোট বা হালকা হবে না।
+          প্রিন্টার অ্যাপে ছবি খুলে পেপার সাইজ = স্টিকার সাইজ, Scale/Fit = 100% বা "Actual size" দিন।
+        </div>
+        {imgMsg && <div className="text-emerald-300">{imgMsg}</div>}
       </div>
 
       {/* Main Thermal Workspace */}
@@ -473,7 +584,7 @@ export const CourierThermalPrinter: React.FC<CourierThermalPrinterProps> = ({
             </div>
 
             {/* Printable Container */}
-            <div className="print-container bg-neutral-950/60 p-4 rounded-xl border border-neutral-800/80 flex flex-col items-center overflow-auto max-h-[620px]">
+            <div ref={previewRef} className="print-container bg-neutral-950/60 p-4 rounded-xl border border-neutral-800/80 flex flex-col items-center overflow-auto max-h-[620px]">
               {batchMode ? (
                 batchInvoices.length > 0 ? (
                   batchInvoices.map((inv) => renderThermalLabel(inv, selectedFormat))
