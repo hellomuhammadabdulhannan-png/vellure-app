@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText,
   Truck,
@@ -30,6 +30,7 @@ import { VELLURE_LOGO } from '../../assets/logo';
 import { PrintPortal } from '../PrintPortal';
 import { ReceiptInvoicePrint, InvoiceFormat } from '../PrintLayouts';
 import { printNow, loadSetting, saveSetting } from '../../utils/printEngine';
+import { labelElementToPng, downloadBlob, shareBlob } from '../../utils/labelImage';
 
 interface InvoiceGeneratorDispatchProps {
   invoices: Invoice[];
@@ -61,6 +62,49 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
   const [invoiceFormat, setInvoiceFormat] = useState<InvoiceFormat>(() =>
     loadSetting<InvoiceFormat>('invoice_format', ['thermal80', 'a4'] as const, 'thermal80')
   );
+
+  // ---- Invoice as one exact-size black & white image (for phone printer apps) ----
+  const exportRef = useRef<HTMLDivElement>(null);
+  const exportModeRef = useRef<'download' | 'share'>('download');
+  const [exportInvoice, setExportInvoice] = useState<Invoice | null>(null);
+  const [exportMsg, setExportMsg] = useState('');
+
+  const startInvoiceImage = (inv: Invoice, mode: 'download' | 'share') => {
+    exportModeRef.current = mode;
+    setExportMsg('');
+    setExportInvoice(null);
+    setTimeout(() => setExportInvoice(inv), 0);
+  };
+
+  useEffect(() => {
+    if (!exportInvoice) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // wait for layout + fonts so the measured height is final
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        try { await (document as any).fonts?.ready; } catch { /* ignore */ }
+        const el = exportRef.current?.firstElementChild as HTMLElement | null;
+        if (!el || cancelled) return;
+        // 80mm roll: 576 dots = 72mm printable width at 203 DPI. A4: ~200 DPI.
+        const widthPx = invoiceFormat === 'a4' ? 1654 : 576;
+        const heightPx = Math.max(1, Math.round((widthPx * el.offsetHeight) / el.offsetWidth));
+        const blob = await labelElementToPng(el, { widthPx, heightPx, threshold: 190 });
+        const name = `vellure-invoice-${exportInvoice.id}.png`;
+        if (exportModeRef.current === 'share') {
+          if (!(await shareBlob(blob, name))) downloadBlob(blob, name);
+        } else {
+          downloadBlob(blob, name);
+        }
+        setExportMsg(`ইনভয়েসের ছবি তৈরি হয়েছে (${widthPx}×${heightPx} px, এক পেজ, কালো-সাদা)।`);
+      } catch {
+        setExportMsg('ছবি তৈরি করা যায়নি। Chrome ব্যবহার করুন।');
+      } finally {
+        if (!cancelled) setExportInvoice(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [exportInvoice]);
 
   // Direct print from the list row (no need to open the preview first)
   const [directPrintInvoice, setDirectPrintInvoice] = useState<Invoice | null>(null);
@@ -658,6 +702,13 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
                           >
                             <FileText className="w-3.5 h-3.5" />
                             <span>Invoice</span>
+                          </button>
+                          <button
+                            onClick={() => startInvoiceImage(inv, 'download')}
+                            title="ইনভয়েসের ছবি (PNG) - মোবাইল প্রিন্টার অ্যাপের জন্য"
+                            className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-neutral-950 text-[11px] font-bold transition-colors"
+                          >
+                            PNG
                           </button>
                           <button
                             onClick={() => onNavigateToThermal(inv.id)}
@@ -1659,6 +1710,19 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
                   <option value="a4">A4 Paper</option>
                 </select>
                 <button
+                  onClick={() => startInvoiceImage(viewingInvoice, 'download')}
+                  className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs"
+                  title="মোবাইল প্রিন্টার অ্যাপের জন্য: এক পেজের কালো-সাদা ছবি"
+                >
+                  ⬇ ছবি (PNG)
+                </button>
+                <button
+                  onClick={() => startInvoiceImage(viewingInvoice, 'share')}
+                  className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-xs border border-neutral-700"
+                >
+                  ↗ শেয়ার
+                </button>
+                <button
                   onClick={handlePrintInvoice}
                   className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 text-neutral-950 font-bold text-xs"
                 >
@@ -1667,6 +1731,19 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {exportMsg && (
+        <div className="no-print fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] max-w-[92vw] px-4 py-2 rounded-xl bg-emerald-900 border border-emerald-600 text-emerald-100 text-xs shadow-2xl" onClick={() => setExportMsg('')}>
+          {exportMsg}
+        </div>
+      )}
+
+      {/* Off-screen copy used to build the invoice image (laid out, but out of sight) */}
+      {exportInvoice && (
+        <div ref={exportRef} aria-hidden="true" style={{ position: 'fixed', left: '-10000px', top: 0, background: '#fff' }}>
+          <ReceiptInvoicePrint invoice={exportInvoice} format={invoiceFormat} />
         </div>
       )}
 

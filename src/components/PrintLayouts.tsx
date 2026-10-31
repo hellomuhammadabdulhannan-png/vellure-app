@@ -28,7 +28,7 @@ export const ReceiptInvoicePrint: React.FC<{ invoice: Invoice; format: InvoiceFo
       style={{
         width: isA4 ? '190mm' : '72mm',
         margin: isA4 ? '0 auto' : '0 4mm',
-        padding: isA4 ? '4mm 0' : '2mm 0',
+        padding: isA4 ? '4mm 0' : '2mm 2.5mm',
         background: '#fff',
         color: '#000',
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
