@@ -15,9 +15,10 @@ export type InvoiceFormat = 'thermal80' | 'a4';
 const dashed: React.CSSProperties = { borderTop: '1px dashed #000', margin: '1.6mm 0' };
 const row: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: '2mm' };
 
-export const ReceiptInvoicePrint: React.FC<{ invoice: Invoice; format: InvoiceFormat }> = ({
+export const ReceiptInvoicePrint: React.FC<{ invoice: Invoice; format: InvoiceFormat; compact?: boolean }> = ({
   invoice,
   format,
+  compact = false,
 }) => {
   const isA4 = format === 'a4';
   const unpaid = invoice.codAmount > 0;
@@ -42,7 +43,7 @@ export const ReceiptInvoicePrint: React.FC<{ invoice: Invoice; format: InvoiceFo
         <img
           src={VELLURE_LOGO_PRINT}
           alt={BRAND_DETAILS.name}
-          style={{ width: isA4 ? '48mm' : '36mm', height: 'auto', display: 'block', margin: '0 auto' }}
+          style={{ width: isA4 ? (compact ? '30mm' : '48mm') : compact ? '18mm' : '36mm', height: 'auto', display: 'block', margin: '0 auto' }}
         />
         <div style={{ fontSize: isA4 ? '9pt' : '7.5pt', marginTop: '1mm' }}>{BRAND_DETAILS.address}</div>
         <div style={{ fontSize: isA4 ? '9pt' : '7.5pt' }}>

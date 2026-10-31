@@ -30,7 +30,7 @@ import { VELLURE_LOGO } from '../../assets/logo';
 import { PrintPortal } from '../PrintPortal';
 import { ReceiptInvoicePrint, InvoiceFormat } from '../PrintLayouts';
 import { printNow, loadSetting, saveSetting } from '../../utils/printEngine';
-import { labelElementToPng, downloadBlob, shareBlob } from '../../utils/labelImage';
+import { labelElementToPng, downloadBlob, shareBlob, mmToDots } from '../../utils/labelImage';
 
 interface InvoiceGeneratorDispatchProps {
   invoices: Invoice[];
@@ -88,8 +88,17 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
         if (!el || cancelled) return;
         // 80mm roll: 576 dots = 72mm printable width at 203 DPI. A4: ~200 DPI.
         const widthPx = invoiceFormat === 'a4' ? 1654 : 576;
-        const heightPx = Math.max(1, Math.round((widthPx * el.offsetHeight) / el.offsetWidth));
-        const blob = await labelElementToPng(el, { widthPx, heightPx, threshold: 190 });
+        const fixedLen = invoiceFormat !== 'a4' && invoiceLenMm > 0;
+        const heightPx = fixedLen
+          ? mmToDots(invoiceLenMm)
+          : Math.max(1, Math.round((widthPx * el.offsetHeight) / el.offsetWidth));
+        saveInvoiceOptions();
+        const blob = await labelElementToPng(el, {
+          widthPx,
+          heightPx,
+          threshold: 190,
+          fit: fixedLen ? 'contain' : 'stretch',
+        });
         const name = `vellure-invoice-${exportInvoice.id}.png`;
         if (exportModeRef.current === 'share') {
           if (!(await shareBlob(blob, name))) downloadBlob(blob, name);
@@ -115,13 +124,34 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [directPrintInvoice]);
 
+  // Page length (mm) of the invoice. Empty = automatic (as long as needed).
+  const [invoiceLen, setInvoiceLen] = useState<string>(() => {
+    try { return localStorage.getItem('vellure_print_invoice_len') || ''; } catch { return ''; }
+  });
+  const [compactInvoice, setCompactInvoice] = useState<boolean>(() => {
+    try { return localStorage.getItem('vellure_print_invoice_compact') !== 'false'; } catch { return true; }
+  });
+  const invoiceLenMm = Math.max(0, Number(invoiceLen) || 0);
+  const saveInvoiceOptions = () => {
+    try {
+      localStorage.setItem('vellure_print_invoice_len', invoiceLen);
+      localStorage.setItem('vellure_print_invoice_compact', String(compactInvoice));
+    } catch { /* ignore */ }
+  };
+
   const handlePrintInvoice = () => {
+    saveInvoiceOptions();
     saveSetting('invoice_format', invoiceFormat);
     if (invoiceFormat === 'a4') {
       printNow({ widthMm: 210, heightMm: 297, marginMm: 8 });
     } else {
       // 80mm roll: width fixed, height = content height (one invoice = one page)
-      printNow({ widthMm: 80, autoHeight: true, marginMm: 0 });
+      if (invoiceLenMm > 0) {
+        // fixed page length: everything is shrunk (if needed) to fit on this one page
+        printNow({ widthMm: 80, heightMm: invoiceLenMm, marginMm: 0, fitToHeight: true });
+      } else {
+        printNow({ widthMm: 80, autoHeight: true, marginMm: 0 });
+      }
     }
   };
 
@@ -1677,7 +1707,7 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
             </div>
 
             {/* Actions */}
-            <div className="flex justify-between items-center pt-3 border-t border-neutral-800">
+            <div className="flex flex-wrap justify-between items-center gap-2 pt-3 border-t border-neutral-800">
               <button
                 onClick={() => {
                   const inv = viewingInvoice;
@@ -1690,7 +1720,7 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
                 <span>Edit Invoice Details</span>
               </button>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => {
                     onNavigateToThermal(viewingInvoice.id);
@@ -1700,6 +1730,27 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
                 >
                   Thermal Sticker
                 </button>
+                <label className="flex items-center gap-1 text-[11px] text-neutral-300" title="খালি রাখলে লম্বা নিজে নিজে ঠিক হবে">
+                  লম্বা
+                  <input
+                    type="number"
+                    min={40}
+                    max={600}
+                    placeholder="অটো"
+                    value={invoiceLen}
+                    onChange={(e) => setInvoiceLen(e.target.value)}
+                    className="w-14 px-1.5 py-1.5 rounded-lg border text-center font-mono text-xs"
+                  />
+                  mm
+                </label>
+                <label className="flex items-center gap-1 text-[11px] text-neutral-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={compactInvoice}
+                    onChange={(e) => setCompactInvoice(e.target.checked)}
+                  />
+                  ছোট লোগো
+                </label>
                 <select
                   value={invoiceFormat}
                   onChange={(e) => setInvoiceFormat(e.target.value as InvoiceFormat)}
@@ -1743,14 +1794,14 @@ export const InvoiceGeneratorDispatch: React.FC<InvoiceGeneratorDispatchProps> =
       {/* Off-screen copy used to build the invoice image (laid out, but out of sight) */}
       {exportInvoice && (
         <div ref={exportRef} aria-hidden="true" style={{ position: 'fixed', left: '-10000px', top: 0, background: '#fff' }}>
-          <ReceiptInvoicePrint invoice={exportInvoice} format={invoiceFormat} />
+          <ReceiptInvoicePrint invoice={exportInvoice} format={invoiceFormat} compact={compactInvoice} />
         </div>
       )}
 
       {/* Printable invoice (hidden on screen, the only thing printed) */}
       <PrintPortal>
         {(viewingInvoice || directPrintInvoice) && (
-          <ReceiptInvoicePrint invoice={(viewingInvoice || directPrintInvoice)!} format={invoiceFormat} />
+          <ReceiptInvoicePrint invoice={(viewingInvoice || directPrintInvoice)!} format={invoiceFormat} compact={compactInvoice} />
         )}
       </PrintPortal>
     </div>

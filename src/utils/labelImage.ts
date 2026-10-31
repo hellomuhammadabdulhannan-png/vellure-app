@@ -60,6 +60,8 @@ export interface LabelImageOptions {
   heightPx: number;
   /** Black/white cut-off 0-255. Higher = darker print. */
   threshold?: number;
+  /** 'stretch' fills the sticker (default). 'contain' shrinks the whole thing so everything fits. */
+  fit?: 'stretch' | 'contain';
 }
 
 export async function labelElementToPng(el: HTMLElement, opts: LabelImageOptions): Promise<Blob> {
@@ -73,23 +75,35 @@ export async function labelElementToPng(el: HTMLElement, opts: LabelImageOptions
   copyComputedStyles(el, clone);
   await inlineImages(clone);
 
-  // stretch the design to the target aspect ratio so the sticker is filled edge to edge
-  const targetH = Math.round((srcW * heightPx) / widthPx);
-  clone.style.width = `${srcW}px`;
-  clone.style.height = `${Math.max(targetH, 1)}px`;
+  const contain = opts.fit === 'contain';
+  let boxW = srcW;
+  let boxH: number;
+  let scale: number;
+  let offX = 0;
+  if (contain) {
+    boxH = srcH;
+    scale = Math.min(widthPx / srcW, heightPx / srcH);
+    offX = Math.max(0, (widthPx - srcW * scale) / 2);
+  } else {
+    // stretch the design to the target aspect ratio so the sticker is filled edge to edge
+    boxH = Math.max(Math.round((srcW * heightPx) / widthPx), 1);
+    scale = widthPx / srcW;
+  }
+  clone.style.width = `${boxW}px`;
+  clone.style.height = `${boxH}px`;
   clone.style.margin = '0';
   clone.style.boxShadow = 'none';
   clone.style.borderRadius = '0';
   clone.style.boxSizing = 'border-box';
-  const scale = widthPx / srcW;
 
   const xhtml = new XMLSerializer().serializeToString(clone);
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}">` +
-    `<foreignObject x="0" y="0" width="${srcW}" height="${Math.max(targetH, 1)}" ` +
-    `style="transform-origin:0 0;transform:scale(${scale})">` +
-    `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${srcW}px;height:${Math.max(targetH, 1)}px;background:#fff">${xhtml}</div>` +
-    `</foreignObject></svg>`;
+    `<rect width="100%" height="100%" fill="#fff"/>` +
+    `<g transform="translate(${offX},0) scale(${scale})">` +
+    `<foreignObject x="0" y="0" width="${boxW}" height="${boxH}">` +
+    `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${boxW}px;height:${boxH}px;background:#fff">${xhtml}</div>` +
+    `</foreignObject></g></svg>`;
 
   const img = new Image();
   img.decoding = 'sync';

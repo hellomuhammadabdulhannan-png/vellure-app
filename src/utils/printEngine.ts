@@ -17,6 +17,8 @@ export interface PrintSpec {
   autoHeight?: boolean;
   /** Page margin in mm (default 0). */
   marginMm?: number;
+  /** With a fixed heightMm: shrink the content (if needed) so it all fits on ONE page. */
+  fitToHeight?: boolean;
 }
 
 const STYLE_ID = 'vellure-page-style';
@@ -56,11 +58,21 @@ export function printNow(spec: PrintSpec): void {
     heightMm = measureHeightMm(root, spec.widthMm - margin * 2) + margin * 2 + 4;
   }
 
+  // fixed page length: shrink content that is taller than the page so it never spills to page 2
+  const rootEl = root as HTMLElement;
+  rootEl.style.zoom = '';
+  if (spec.fitToHeight && spec.heightMm && !spec.autoHeight) {
+    const natural = measureHeightMm(rootEl, spec.widthMm - margin * 2);
+    const room = spec.heightMm - margin * 2 - 1;
+    if (natural > room) rootEl.style.zoom = String(Math.max(0.3, room / natural));
+  }
+
   const styleEl = getPageStyleEl();
   styleEl.textContent = `@page { size: ${spec.widthMm}mm ${heightMm}mm; margin: ${margin}mm; }`;
 
   const cleanup = () => {
     styleEl.textContent = '';
+    rootEl.style.zoom = '';
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
